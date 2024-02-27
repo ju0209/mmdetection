@@ -6,6 +6,11 @@ __pycache__/
 # C extensions
 *.so
 
+# pyj
+experiments/
+outputs/
+~/nltk_data/
+
 # Distribution / packaging
 .Python
 build/

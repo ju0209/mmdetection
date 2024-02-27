@@ -12,6 +12,8 @@ from mmdet.structures import SampleList
 from mmdet.utils import ConfigType, OptConfigType, OptMultiConfig
 from .single_stage import SingleStageDetector
 
+from mmdet.structures.bbox import *
+from mmengine.structures import InstanceData
 
 def find_noun_phrases(caption: str) -> list:
     """Find noun phrases in a caption using nltk.
@@ -228,7 +230,7 @@ class GLIP(SingleStageDetector):
             init_cfg=init_cfg)
         self.language_model = MODELS.build(language_model)
 
-        self._special_tokens = '. '
+        self._special_tokens = ' . '
 
     def to_enhance_text_prompts(self, original_caption, enhanced_text_prompts):
         caption_string = ''
@@ -465,7 +467,8 @@ class GLIP(SingleStageDetector):
     def predict(self,
                 batch_inputs: Tensor,
                 batch_data_samples: SampleList,
-                rescale: bool = True) -> SampleList:
+                rescale: bool = True,
+                postprocess: bool = True) -> SampleList:
         """Predict results from a batch of inputs and data samples with post-
         processing.
 
@@ -569,6 +572,27 @@ class GLIP(SingleStageDetector):
                 language_dict_features,
                 batch_data_samples,
                 rescale=rescale)
+            
+        if postprocess:
+            for i, (data_sample, results, entity) in enumerate(zip(batch_data_samples, results_list, entities)):
+                if len(results) > 0:
+                    labels = results.labels.tolist()
+                    scores = results.scores.tolist()
+                    boxes = results.bboxes
+                    box_list = boxes.to(torch.int64).tolist()
+                    
+                    box_list, labels, scores = select_main_label(box_list, labels, scores)
+                    box_list, labels, scores = remove_small_box(box_list, labels, scores, entity)
+                    box_list, labels, scores = apply_nms(data_sample, box_list, labels, scores, entity)
+                    # box_list, labels, scores = add_label_names(data_sample, box_list, labels, scores, entity)
+                    box_list, labels, scores = check_dress(box_list, labels, scores, entity)
+                    box_list, labels, scores = check_shoes(box_list, labels, scores, entity)
+                    
+                    results = InstanceData()
+                    results.bboxes = torch.tensor(box_list, dtype=torch.float32)
+                    results.labels = torch.tensor(labels)
+                    results.scores = torch.tensor(scores)
+                    results_list[i]=results
 
         for data_sample, pred_instances, entity in zip(batch_data_samples,
                                                        results_list, entities):

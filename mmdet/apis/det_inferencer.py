@@ -395,7 +395,7 @@ class DetInferencer(BaseInferencer):
                 ori_inputs[i]['stuff_text'] = stuff_texts[i]
 
         inputs = self.preprocess(
-            ori_inputs, batch_size=batch_size, **preprocess_kwargs)
+            ori_inputs, batch_size=batch_size, **preprocess_kwargs)     # TODO batch_size
 
         results_dict = {'predictions': [], 'visualization': []}
         for ori_imgs, data in (track(inputs, description='Inference')
