@@ -581,18 +581,34 @@ class GLIP(SingleStageDetector):
                     boxes = results.bboxes
                     box_list = boxes.to(torch.int64).tolist()
                     
-                    box_list, labels, scores = select_main_label(box_list, labels, scores)
-                    box_list, labels, scores = remove_small_box(box_list, labels, scores, entity)
-                    box_list, labels, scores = apply_nms(data_sample, box_list, labels, scores, entity)
-                    # box_list, labels, scores = add_label_names(data_sample, box_list, labels, scores, entity)
-                    box_list, labels, scores = check_dress(box_list, labels, scores, entity)
-                    box_list, labels, scores = check_shoes(box_list, labels, scores, entity)
+                    if is_night(labels, scores, entity):
+                        results = InstanceData()
+                        results.bboxes = torch.empty(0,4)
+                        results.labels = torch.empty(0, dtype=torch.int64)
+                        results.scores = torch.empty(0)
+                        results_list[i]=results
                     
-                    results = InstanceData()
-                    results.bboxes = torch.tensor(box_list, dtype=torch.float32)
-                    results.labels = torch.tensor(labels)
-                    results.scores = torch.tensor(scores)
-                    results_list[i]=results
+                    else:
+                        box_list, labels, scores = select_main_label(box_list, labels, scores)
+                        box_list, labels, scores = remove_small_box(box_list, labels, scores, entity)
+                        box_list, labels, scores = filter_zoomin_image(box_list, labels, scores, entity, data_sample.img_shape)
+                        box_list, labels, scores = apply_nms(box_list, labels, scores, entity, data_sample.img_shape)
+                        box_list, labels, scores = check_boxes(box_list, labels, scores, entity)
+                        box_list, labels, scores = check_tops(box_list, labels, scores, entity)
+                        box_list, labels, scores = remove_blurred_box(box_list, labels, scores, data_sample.img_path)
+                        
+                        if len(labels)==0:
+                            results = InstanceData()
+                            results.bboxes = torch.empty(0,4)
+                            results.labels = torch.empty(0, dtype=torch.int64)
+                            results.scores = torch.empty(0)
+                            results_list[i]=results
+                        else:
+                            results = InstanceData()
+                            results.bboxes = torch.tensor(box_list, dtype=torch.float32)
+                            results.labels = torch.tensor(labels)
+                            results.scores = torch.tensor(scores)
+                            results_list[i]=results
 
         for data_sample, pred_instances, entity in zip(batch_data_samples,
                                                        results_list, entities):
